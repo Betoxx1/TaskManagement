@@ -66,25 +66,25 @@ class AuthService {
 
   // Guardar token en localStorage
   saveAuthData(token: string, user: any): void {
-    localStorage.setItem('auth_token', token);
-    localStorage.setItem('user_data', JSON.stringify(user));
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
   }
 
   // Obtener token guardado
   getToken(): string | null {
-    return localStorage.getItem('auth_token');
+    return localStorage.getItem('token');
   }
 
   // Obtener datos de usuario guardados
   getUser(): any | null {
-    const userData = localStorage.getItem('user_data');
+    const userData = localStorage.getItem('user');
     return userData ? JSON.parse(userData) : null;
   }
 
   // Limpiar datos de autenticación
   clearAuthData(): void {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   }
 
   // Verificar si el usuario está autenticado
