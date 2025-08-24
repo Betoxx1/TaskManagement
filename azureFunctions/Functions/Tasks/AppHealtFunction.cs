@@ -1,23 +1,22 @@
 using System;
-using System.IO;
+using System.Net;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace TaskManagement
 {
-    public static class AppHealtFunction
+    public class AppHealtFunction
     {
-        [FunctionName("health")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequest req,
-            ILogger log)
+        [Function("health")]
+        public async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequestData req,
+            FunctionContext executionContext)
         {
-            log.LogInformation("Health check endpoint accessed.");
+            var logger = executionContext.GetLogger("AppHealtFunction");
+            logger.LogInformation("Health check endpoint accessed.");
 
             try
             {
@@ -37,11 +36,19 @@ namespace TaskManagement
                     }
                 };
 
-                return new OkObjectResult(healthResponse);
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await response.WriteStringAsync(JsonSerializer.Serialize(new 
+                { 
+                    success = true, 
+                    data = healthResponse, 
+                    message = "Health check exitoso" 
+                }));
+                return response;
             }
             catch (Exception ex)
             {
-                log.LogError(ex, "Error en health check");
+                logger.LogError(ex, "Error en health check");
                 
                 var errorResponse = new
                 {
@@ -51,10 +58,15 @@ namespace TaskManagement
                     error = ex.Message
                 };
 
-                return new ObjectResult(errorResponse)
-                {
-                    StatusCode = 500
-                };
+                var response = req.CreateResponse(HttpStatusCode.InternalServerError);
+                response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await response.WriteStringAsync(JsonSerializer.Serialize(new 
+                { 
+                    success = false, 
+                    data = errorResponse, 
+                    message = "Error en health check" 
+                }));
+                return response;
             }
         }
     }

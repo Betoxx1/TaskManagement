@@ -1,0 +1,21 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+      "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+      "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+      "DbProvider": "Sqlite",
+      "ConnectionStrings__DefaultConnection": "Data Source=taskmanagement.db",
+      "Jwt__SecretKey": "your-super-secret-key-here-at-least-32-characters-long",
+      "Jwt__Issuer": "TaskManagement",
+      "Jwt__Audience": "TaskManagement.Users",
+      "Jwt__ExpirationMinutes": "60",
+      "AzureAd__ClientId": "your-client-id",
+      "AzureAd__ClientSecret": "your-client-secret",
+      "AzureAd__TenantId": "your-tenant-id",
+      "AzureAd__RedirectUri": "http://localhost:7071/api/auth/callback"
+  },
+  "Host": {
+    "CORS": "http://localhost:3000",
+    "CORSCredentials": false
+  }
+}

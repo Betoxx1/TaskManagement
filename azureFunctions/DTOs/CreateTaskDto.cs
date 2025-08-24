@@ -1,6 +1,8 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using TaskManagement.Models;
+using TaskStatus = TaskManagement.Models.TaskStatus;
+using TaskPriority = TaskManagement.Models.TaskPriority;
 
 namespace TaskManagement.DTOs
 {

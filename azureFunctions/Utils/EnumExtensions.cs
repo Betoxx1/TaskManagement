@@ -3,6 +3,8 @@ using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using TaskManagement.Models;
+using TaskStatus = TaskManagement.Models.TaskStatus;
+using TaskPriority = TaskManagement.Models.TaskPriority;
 
 namespace TaskManagement.Utils
 {

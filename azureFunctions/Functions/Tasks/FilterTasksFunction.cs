@@ -1,17 +1,15 @@
 using System;
 using System.Globalization;
+using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using System.Text.Json;
+using System.Web;
 using TaskManagement.Services.Interfaces;
 using TaskManagement.Utils;
-using TaskManagement.Factories;
-using TaskManagement.Repositories.Implementations;
-using TaskManagement.Services.Implementations;
 using TaskManagement.Models;
 
 using TaskStatus = TaskManagement.Models.TaskStatus;
@@ -19,41 +17,49 @@ using TaskPriority = TaskManagement.Models.TaskPriority;
 
 namespace TaskManagement
 {
-    public static class FilterTasksFunction
+    public class FilterTasksFunction
     {
-        [FunctionName("filter")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "task/filter")] HttpRequest req,
-            ILogger log,
-            ExecutionContext context)
+        private readonly ITaskService _taskService;
+        private readonly JwtValidator _jwtValidator;
+
+        public FilterTasksFunction(
+            ITaskService taskService,
+            JwtValidator jwtValidator)
         {
-            log.LogInformation("Filter Tasks function processed a request.");
+            _taskService = taskService;
+            _jwtValidator = jwtValidator;
+        }
+
+        [Function("filter")]
+        public async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "task/filter")] HttpRequestData req,
+            FunctionContext executionContext)
+        {
+            var logger = executionContext.GetLogger("FilterTasksFunction");
+            logger.LogInformation("Filter Tasks function processed a request.");
 
             try
             {
-                // 1. Configuración
-                var config = new ConfigurationBuilder()
-                    .SetBasePath(context.FunctionAppDirectory)
-                    .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
-                    .AddEnvironmentVariables()
-                    .Build();
-
-                // 2. Validar Authorization Header
-                if (!req.Headers.TryGetValue("Authorization", out var authHeader))
+                // 1. Validar Authorization Header
+                if (!req.Headers.TryGetValues("Authorization", out var authHeaders))
                 {
-                    return ResponseBuilder.Unauthorized("Token de autorización requerido");
+                    var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await unauthorizedResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Token de autorización requerido" }));
+                    return unauthorizedResponse;
                 }
 
-                var token = authHeader.ToString().Replace("Bearer ", "");
-                var jwtValidator = new JwtValidator(config);
-                var userId = jwtValidator.GetUserIdFromToken(token);
+                var token = authHeaders.FirstOrDefault()?.Replace("Bearer ", "");
+                var userId = _jwtValidator.GetUserIdFromToken(token);
                 
                 if (string.IsNullOrEmpty(userId))
                 {
-                    return ResponseBuilder.Unauthorized("Token inválido");
+                    var invalidTokenResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await invalidTokenResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Token inválido" }));
+                    return invalidTokenResponse;
                 }
 
-                // 3. Extraer parámetros de filtro de query string
+                // 2. Extraer parámetros de filtro de query string
+                var query = HttpUtility.ParseQueryString(req.Url.Query);
                 TaskStatus? status = null;
                 TaskPriority? priority = null;
                 DateTime? dueDateFrom = null;
@@ -61,57 +67,58 @@ namespace TaskManagement
                 string category = null;
 
                 // Parsear status
-                if (req.Query.TryGetValue("status", out var statusQuery) && 
-                    Enum.TryParse<TaskStatus>(statusQuery, true, out var parsedStatus))
+                if (!string.IsNullOrEmpty(query["status"]) && 
+                    Enum.TryParse<TaskStatus>(query["status"], true, out var parsedStatus))
                 {
                     status = parsedStatus;
                 }
 
                 // Parsear priority
-                if (req.Query.TryGetValue("priority", out var priorityQuery) && 
-                    Enum.TryParse<TaskPriority>(priorityQuery, true, out var parsedPriority))
+                if (!string.IsNullOrEmpty(query["priority"]) && 
+                    Enum.TryParse<TaskPriority>(query["priority"], true, out var parsedPriority))
                 {
                     priority = parsedPriority;
                 }
 
                 // Parsear dueDateFrom
-                if (req.Query.TryGetValue("dueDateFrom", out var dueDateFromQuery) && 
-                    DateTime.TryParse(dueDateFromQuery, out var parsedDueDateFrom))
+                if (!string.IsNullOrEmpty(query["dueDateFrom"]) && 
+                    DateTime.TryParse(query["dueDateFrom"], out var parsedDueDateFrom))
                 {
                     dueDateFrom = parsedDueDateFrom;
                 }
 
                 // Parsear dueDateTo
-                if (req.Query.TryGetValue("dueDateTo", out var dueDateToQuery) && 
-                    DateTime.TryParse(dueDateToQuery, out var parsedDueDateTo))
+                if (!string.IsNullOrEmpty(query["dueDateTo"]) && 
+                    DateTime.TryParse(query["dueDateTo"], out var parsedDueDateTo))
                 {
                     dueDateTo = parsedDueDateTo;
                 }
 
                 // Obtener category
-                if (req.Query.TryGetValue("category", out var categoryQuery))
-                {
-                    category = categoryQuery.ToString();
-                }
+                category = query["category"];
 
-                // 4. Inicializar servicios
-                var connectionFactory = new SqlConnectionFactory(config);
-                var taskRepository = new TaskRepository(connectionFactory);
-                var userRepository = new UserRepository(connectionFactory);
-                var taskService = new TaskService(taskRepository, userRepository);
+                // 3. Filtrar tareas
+                var filteredTasks = await _taskService.FilterTasksAsync(userId, status, priority, category, dueDateFrom, dueDateTo);
 
-                // 5. Filtrar tareas
-                var filteredTasks = await taskService.FilterTasksAsync(userId, status, priority, category, dueDateFrom, dueDateTo);
-
-                // 6. Respuesta exitosa
-                log.LogInformation($"Se filtraron las tareas exitosamente para el usuario {userId}. Filtros aplicados: Status={status}, Priority={priority}, Category={category}");
-                return ResponseBuilder.Success(filteredTasks, "Tareas filtradas exitosamente");
-
+                // 4. Respuesta exitosa
+                logger.LogInformation($"Se filtraron las tareas exitosamente para el usuario {userId}. Filtros aplicados: Status={status}, Priority={priority}, Category={category}");
+                
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await response.WriteStringAsync(JsonSerializer.Serialize(new 
+                { 
+                    success = true, 
+                    data = filteredTasks, 
+                    message = "Tareas filtradas exitosamente" 
+                }));
+                return response;
             }
             catch (Exception ex)
             {
-                log.LogError(ex, "Error inesperado al filtrar las tareas");
-                return ResponseBuilder.InternalServerError("Error interno del servidor");
+                logger.LogError(ex, "Error inesperado al filtrar las tareas");
+                var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Error interno del servidor" }));
+                return errorResponse;
             }
         }
     }

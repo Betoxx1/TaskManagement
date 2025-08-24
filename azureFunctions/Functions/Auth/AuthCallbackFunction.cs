@@ -4,85 +4,127 @@ using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
+using System.Reflection;
+using System.Net;
+using System.Linq;
 using TaskManagement.Utils;
-using TaskManagement.Factories;
-using TaskManagement.Repositories.Implementations;
+using TaskManagement.Repositories.Interfaces;
 using TaskManagement.Models;
 
 namespace TaskManagement
 {
-    public static class AuthCallbackFunction
+    public class AuthCallbackFunction
     {
-        [FunctionName("auth")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "auth/callback")] HttpRequest req,
-            ILogger log,
-            ExecutionContext context)
+        private readonly IUserRepository _userRepository;
+        private readonly IConfiguration _configuration;
+
+        public AuthCallbackFunction(IUserRepository userRepository, IConfiguration configuration)
         {
-            log.LogInformation("Auth Callback function processed a request.");
+            _userRepository = userRepository;
+            _configuration = configuration;
+        }
+
+        [Function("auth")]
+        public async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "auth/callback")] HttpRequestData req,
+            FunctionContext executionContext)
+        {
+            var logger = executionContext.GetLogger("AuthCallbackFunction");
+            logger.LogInformation("Auth Callback function processed a request.");
 
             try
             {
-                // 1. Configuración
-                var config = new ConfigurationBuilder()
-                    .SetBasePath(context.FunctionAppDirectory)
-                    .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
-                    .AddEnvironmentVariables()
-                    .Build();
+                // 1. Usar configuración inyectada
+                var config = _configuration;
 
                 // 2. Obtener el código de autorización del query string
-                string authorizationCode = req.Query["code"];
-                string state = req.Query["state"];
-                string error = req.Query["error"];
-                string errorDescription = req.Query["error_description"];
+                var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                string authorizationCode = query["code"];
+                string state = query["state"];
+                string error = query["error"];
+                string errorDescription = query["error_description"];
 
                 // 3. Manejar errores de OAuth
                 if (!string.IsNullOrEmpty(error))
                 {
-                    log.LogWarning($"OAuth error: {error} - {errorDescription}");
-                    return ResponseBuilder.BadRequest($"Error de autenticación: {error} - {errorDescription}");
+                    logger.LogWarning($"OAuth error: {error} - {errorDescription}");
+                    var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"Error de autenticación: {error} - {errorDescription}" }));
+                    return errorResponse;
                 }
 
                 // 4. Validar que tenemos el código de autorización
                 if (string.IsNullOrEmpty(authorizationCode))
                 {
-                    return ResponseBuilder.BadRequest("Código de autorización no proporcionado");
+                    var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Código de autorización no proporcionado" }));
+                    return badRequestResponse;
                 }
 
-                // 5. Intercambiar código por tokens
-                var tokenResponse = await ExchangeCodeForTokensAsync(authorizationCode, config, log);
+                // 5. Validar configuración de Azure AD (desde la sección Values de local.settings.json)
+                var clientId = config["Values:AzureAd__ClientId"];
+                var clientSecret = config["Values:AzureAd__ClientSecret"];
+                var tenantId = config["Values:AzureAd__TenantId"];
+
+                // Debug logging para diagnosticar configuración
+                logger.LogInformation("Debug Config - ClientId: {ClientId}, ClientSecret: {ClientSecret}, TenantId: {TenantId}", 
+                    clientId ?? "NULL", 
+                    string.IsNullOrEmpty(clientSecret) ? "NULL" : "***CONFIGURED***", 
+                    tenantId ?? "NULL");
+
+                if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret) || string.IsNullOrEmpty(tenantId))
+                {
+                    logger.LogWarning("Azure AD configuration missing - ClientId: {ClientId}, TenantId: {TenantId}", 
+                        string.IsNullOrEmpty(clientId) ? "MISSING" : "CONFIGURED", 
+                        string.IsNullOrEmpty(tenantId) ? "MISSING" : "CONFIGURED");
+                    var configErrorResponse = req.CreateResponse(HttpStatusCode.ServiceUnavailable);
+                    await configErrorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Configuración de Azure AD no completada. Contacte al administrador." }));
+                    return configErrorResponse;
+                }
+
+                // 6. Intercambiar código por tokens
+                var tokenResponse = await ExchangeCodeForTokensAsync(authorizationCode, config, logger);
                 if (tokenResponse == null)
                 {
-                    return ResponseBuilder.BadRequest("Error al obtener tokens de acceso");
+                    var tokenErrorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await tokenErrorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Error al obtener tokens de acceso" }));
+                    return tokenErrorResponse;
                 }
 
-                // 6. Validar y extraer información del token
-                var userClaims = ValidateAndExtractClaims(tokenResponse.IdToken, config, log);
+                // 6. Validar que tenemos el IdToken
+                if (string.IsNullOrEmpty(tokenResponse.IdToken))
+                {
+                    logger.LogError("IdToken is null or empty in token response");
+                    var tokenMissingResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await tokenMissingResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "ID Token no recibido de Azure AD. Verifique los scopes configurados." }));
+                    return tokenMissingResponse;
+                }
+
+                // 7. Validar y extraer información del token
+                var userClaims = ValidateAndExtractClaims(tokenResponse.IdToken, config, logger);
                 if (userClaims == null)
                 {
-                    return ResponseBuilder.Unauthorized("Token inválido");
+                    var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await unauthorizedResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Token inválido" }));
+                    return unauthorizedResponse;
                 }
 
-                // 7. Crear o actualizar usuario en la base de datos
-                var connectionFactory = new SqlConnectionFactory(config);
-                var userRepository = new UserRepository(connectionFactory);
-                
-                var user = await CreateOrUpdateUserAsync(userClaims, userRepository, log);
+                // 8. Crear o actualizar usuario en la base de datos
+                var user = await CreateOrUpdateUserAsync(userClaims, _userRepository, logger);
 
-                // 8. Generar JWT token para la aplicación
+                // 9. Generar JWT token para la aplicación
                 var appToken = GenerateApplicationToken(user, config);
 
-                // 9. Preparar respuesta de éxito
+                // 10. Preparar respuesta de éxito
                 var authResponse = new AuthCallbackResponse
                 {
                     Success = true,
@@ -98,14 +140,24 @@ namespace TaskManagement
                     Message = "Autenticación exitosa"
                 };
 
-                log.LogInformation($"Usuario autenticado exitosamente: {user.Email}");
-                return ResponseBuilder.Success(authResponse, "Autenticación completada exitosamente");
-
+                logger.LogInformation($"Usuario autenticado exitosamente: {user.Email}");
+                
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await response.WriteStringAsync(JsonSerializer.Serialize(new 
+                { 
+                    success = true, 
+                    data = authResponse, 
+                    message = "Autenticación completada exitosamente" 
+                }));
+                return response;
             }
             catch (Exception ex)
             {
-                log.LogError(ex, "Error inesperado en el callback de autenticación");
-                return ResponseBuilder.InternalServerError("Error interno durante la autenticación");
+                logger.LogError(ex, "Error inesperado en el callback de autenticación");
+                var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Error interno durante la autenticación" }));
+                return errorResponse;
             }
         }
 
@@ -116,11 +168,10 @@ namespace TaskManagement
         {
             try
             {
-                var clientId = config["AzureAd__ClientId"];
-                var clientSecret = config["AzureAd__ClientSecret"];
-                var tenantId = config["AzureAd__TenantId"];
-                // var redirectUri = config["AzureAd:RedirectUri"] ?? "http://localhost:7071/api/auth/callback";
-                var redirectUri = config["AzureAd__RedirectUri"] ?? "http://localhost:7071/api/auth/callback";
+                var clientId = config["Values:AzureAd__ClientId"];
+                var clientSecret = config["Values:AzureAd__ClientSecret"];
+                var tenantId = config["Values:AzureAd__TenantId"];
+                var redirectUri = config["Values:AzureAd__RedirectUri"] ?? "http://localhost:7071/api/auth/callback";
 
                 var tokenEndpoint = $"https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token";
 
@@ -141,11 +192,19 @@ namespace TaskManagement
 
                 if (response.IsSuccessStatusCode)
                 {
-                    return JsonConvert.DeserializeObject<TokenResponse>(responseContent);
+                    log.LogInformation($"Token exchange successful. Response: {responseContent}");
+                    var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    log.LogInformation($"Parsed TokenResponse - AccessToken: {(string.IsNullOrEmpty(tokenResponse?.AccessToken) ? "NULL" : "PRESENT")}, IdToken: {(string.IsNullOrEmpty(tokenResponse?.IdToken) ? "NULL" : "PRESENT")}");
+                    return tokenResponse;
                 }
                 else
                 {
-                    log.LogError($"Error obteniendo tokens: {responseContent}");
+                    log.LogError($"Error obteniendo tokens - Status: {response.StatusCode} - Response: {responseContent}");
+                    log.LogError($"Request Details - ClientId: {clientId}, TenantId: {tenantId}, RedirectUri: {redirectUri}");
                     return null;
                 }
             }
@@ -163,12 +222,37 @@ namespace TaskManagement
         {
             try
             {
-                var tokenHandler = new JwtSecurityTokenHandler();
-                var jsonToken = tokenHandler.ReadJwtToken(idToken);
+                // Cargar assembly manualmente si hay problemas
+                try
+                {
+                    var tokenHandler = new JwtSecurityTokenHandler();
+                    var jsonToken = tokenHandler.ReadJwtToken(idToken);
 
-                // En un entorno de producción, aquí validarías la firma del token
-                // Por ahora, solo extraemos los claims
-                return new ClaimsPrincipal(new ClaimsIdentity(jsonToken.Claims, "jwt"));
+                    // En un entorno de producción, aquí validarías la firma del token
+                    // Por ahora, solo extraemos los claims
+                    return new ClaimsPrincipal(new ClaimsIdentity(jsonToken.Claims, "jwt"));
+                }
+                catch (FileNotFoundException ex) when (ex.Message.Contains("System.IdentityModel.Tokens.Jwt"))
+                {
+                    log.LogError("JWT Assembly not found, trying to load manually");
+                    
+                    // Fallback: Load assembly manually
+                    var assemblyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "System.IdentityModel.Tokens.Jwt.dll");
+                    if (File.Exists(assemblyPath))
+                    {
+                        var assembly = Assembly.LoadFrom(assemblyPath);
+                        var handlerType = assembly.GetType("System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler");
+                        var handler = Activator.CreateInstance(handlerType);
+                        var method = handlerType.GetMethod("ReadJwtToken", new[] { typeof(string) });
+                        var token = method.Invoke(handler, new object[] { idToken });
+                        
+                        var claimsProperty = token.GetType().GetProperty("Claims");
+                        var claims = (IEnumerable<Claim>)claimsProperty.GetValue(token);
+                        
+                        return new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
+                    }
+                    throw;
+                }
             }
             catch (Exception ex)
             {
@@ -180,7 +264,7 @@ namespace TaskManagement
         /// <summary>
         /// Crea o actualiza el usuario en la base de datos
         /// </summary>
-        private static async Task<UserModel> CreateOrUpdateUserAsync(ClaimsPrincipal claims, UserRepository userRepository, ILogger log)
+        private static async Task<UserModel> CreateOrUpdateUserAsync(ClaimsPrincipal claims, IUserRepository userRepository, ILogger log)
         {
             var userId = claims.FindFirst("oid")?.Value ?? claims.FindFirst("sub")?.Value;
             var email = claims.FindFirst("email")?.Value ?? claims.FindFirst("preferred_username")?.Value;
@@ -205,6 +289,8 @@ namespace TaskManagement
                     Name = name?.Trim(),
                     Email = email,
                     Role = "User", // Rol por defecto
+                    Department = "General", // Departamento por defecto cuando no está disponible
+                    ProfilePictureUrl = "", // Valor por defecto para evitar NULL constraint
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true,
                     LastLoginAt = DateTime.UtcNow
@@ -247,19 +333,19 @@ namespace TaskManagement
     // DTOs para el intercambio de tokens
     public class TokenResponse
     {
-        [JsonProperty("access_token")]
+        [JsonPropertyName("access_token")]
         public string AccessToken { get; set; }
-
-        [JsonProperty("id_token")]
+        
+        [JsonPropertyName("id_token")]
         public string IdToken { get; set; }
-
-        [JsonProperty("refresh_token")]
+        
+        [JsonPropertyName("refresh_token")]
         public string RefreshToken { get; set; }
-
-        [JsonProperty("expires_in")]
+        
+        [JsonPropertyName("expires_in")]
         public int ExpiresIn { get; set; }
-
-        [JsonProperty("token_type")]
+        
+        [JsonPropertyName("token_type")]
         public string TokenType { get; set; }
     }
 

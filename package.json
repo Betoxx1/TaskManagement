@@ -1,0 +1,15 @@
+{
+  "name": "task-management-fullstack",
+  "version": "1.0.0",
+  "description": "Task Management with Azure Functions and React",
+  "scripts": {
+    "start": "concurrently \"npm run start:api\" \"npm run start:client\"",
+    "start:api": "cd azureFunctions && func start",
+    "start:client": "cd client && npm run dev",
+    "install:all": "cd client && npm install",
+    "dev": "npm run start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

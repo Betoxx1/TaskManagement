@@ -1,106 +1,125 @@
 using System;
-using System.IO;
+using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json;
+using System.Text.Json;
 using TaskManagement.Services.Interfaces;
 using TaskManagement.Utils;
-using TaskManagement.Factories;
-using TaskManagement.Repositories.Implementations;
-using TaskManagement.Services.Implementations;
 using TaskManagement.DTOs;
 
 namespace TaskManagement
 {
-    public static class UpdateTaskFunction
+    public class UpdateTaskFunction
     {
-        [FunctionName("update")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "put", Route = "task/{id}")] HttpRequest req,
-            string id,
-            ILogger log,
-            ExecutionContext context)
+        private readonly ITaskService _taskService;
+        private readonly JwtValidator _jwtValidator;
+
+        public UpdateTaskFunction(
+            ITaskService taskService,
+            JwtValidator jwtValidator)
         {
-            log.LogInformation("Update Task function processed a request.");
+            _taskService = taskService;
+            _jwtValidator = jwtValidator;
+        }
+
+        [Function("update")]
+        public async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "put", Route = "task/{id}")] HttpRequestData req,
+            string id,
+            FunctionContext executionContext)
+        {
+            var logger = executionContext.GetLogger("UpdateTaskFunction");
+            logger.LogInformation("Update Task function processed a request.");
 
             try
             {
-                // 1. Configuración
-                var config = new ConfigurationBuilder()
-                    .SetBasePath(context.FunctionAppDirectory)
-                    .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
-                    .AddEnvironmentVariables()
-                    .Build();
-
-                // 2. Validar y convertir ID
+                // 1. Validar y convertir ID
                 if (string.IsNullOrEmpty(id) || !int.TryParse(id, out int taskId))
                 {
-                    return ResponseBuilder.BadRequest("ID de tarea inválido. Debe ser un número entero.");
+                    var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "ID de tarea inválido. Debe ser un número entero." }));
+                    return badRequestResponse;
                 }
 
-                // 3. Validar Authorization Header
-                if (!req.Headers.TryGetValue("Authorization", out var authHeader))
+                // 2. Validar Authorization Header
+                if (!req.Headers.TryGetValues("Authorization", out var authHeaders))
                 {
-                    return ResponseBuilder.Unauthorized("Token de autorización requerido");
+                    var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await unauthorizedResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Token de autorización requerido" }));
+                    return unauthorizedResponse;
                 }
 
-                var token = authHeader.ToString().Replace("Bearer ", "");
-                var jwtValidator = new JwtValidator(config);
-                var userId = jwtValidator.GetUserIdFromToken(token);
+                var token = authHeaders.FirstOrDefault()?.Replace("Bearer ", "");
+                var userId = _jwtValidator.GetUserIdFromToken(token);
                 
                 if (string.IsNullOrEmpty(userId))
                 {
-                    return ResponseBuilder.Unauthorized("Token inválido");
+                    var invalidTokenResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await invalidTokenResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Token inválido" }));
+                    return invalidTokenResponse;
                 }
 
-                // 4. Leer y validar el body
-                string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+                // 3. Leer y validar el body
+                string requestBody = await req.ReadAsStringAsync();
                 
                 if (string.IsNullOrEmpty(requestBody))
                 {
-                    return ResponseBuilder.BadRequest("Body de la solicitud es requerido");
+                    var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Body de la solicitud es requerido" }));
+                    return badRequestResponse;
                 }
 
-                var updateTaskDto = JsonConvert.DeserializeObject<UpdateTaskDto>(requestBody);
+                var updateTaskDto = JsonSerializer.Deserialize<UpdateTaskDto>(requestBody, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
                 
                 if (updateTaskDto == null)
                 {
-                    return ResponseBuilder.BadRequest("Formato de datos inválido");
+                    var invalidFormatResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                    await invalidFormatResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Formato de datos inválido" }));
+                    return invalidFormatResponse;
                 }
 
-                // 5. Inicializar servicios
-                var connectionFactory = new SqlConnectionFactory(config);
-                var taskRepository = new TaskRepository(connectionFactory);
-                var userRepository = new UserRepository(connectionFactory);
-                var taskService = new TaskService(taskRepository, userRepository);
-
-                // 6. Actualizar la tarea
-                var updatedTask = await taskService.UpdateTaskAsync(taskId, updateTaskDto, userId);
+                // 4. Actualizar la tarea
+                var updatedTask = await _taskService.UpdateTaskAsync(taskId, updateTaskDto, userId);
 
                 if (updatedTask == null)
                 {
-                    return ResponseBuilder.NotFound($"No se encontró la tarea con ID {taskId} o no pertenece al usuario actual");
+                    var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                    await notFoundResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"No se encontró la tarea con ID {taskId} o no pertenece al usuario actual" }));
+                    return notFoundResponse;
                 }
 
-                // 7. Respuesta exitosa
-                log.LogInformation($"Tarea {taskId} actualizada exitosamente para usuario {userId}");
-                return ResponseBuilder.Success(updatedTask, "Tarea actualizada exitosamente");
-
+                // 5. Respuesta exitosa
+                logger.LogInformation($"Tarea {taskId} actualizada exitosamente para usuario {userId}");
+                
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await response.WriteStringAsync(JsonSerializer.Serialize(new 
+                { 
+                    success = true, 
+                    data = updatedTask, 
+                    message = "Tarea actualizada exitosamente" 
+                }));
+                return response;
             }
             catch (ArgumentException ex)
             {
-                log.LogWarning($"Error de validación: {ex.Message}");
-                return ResponseBuilder.BadRequest(ex.Message);
+                logger.LogWarning($"Error de validación: {ex.Message}");
+                var validationErrorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await validationErrorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = ex.Message }));
+                return validationErrorResponse;
             }
             catch (Exception ex)
             {
-                log.LogError(ex, "Error inesperado al actualizar la tarea");
-                return ResponseBuilder.InternalServerError("Error interno del servidor");
+                logger.LogError(ex, "Error inesperado al actualizar la tarea");
+                var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Error interno del servidor" }));
+                return errorResponse;
             }
         }
     }

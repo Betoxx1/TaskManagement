@@ -20,5 +20,6 @@
             "http://127.0.0.1:3000"
         ],
         "supportCredentials": true
-    }
+    },
+    "functionTimeout": "00:05:00"
 }

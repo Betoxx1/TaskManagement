@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
-using System.Data.SqlClient;
+using System.Linq;
 using System.Threading.Tasks;
-using TaskManagement.Factories;
+using Microsoft.EntityFrameworkCore;
+using TaskManagement.Data;
 using TaskManagement.Models;
 using TaskManagement.Repositories.Interfaces;
-using Dapper;
 using TaskStatus = TaskManagement.Models.TaskStatus;
 using TaskPriority = TaskManagement.Models.TaskPriority;
 
@@ -14,160 +13,163 @@ namespace TaskManagement.Repositories.Implementations
 {
     public class TaskRepository : ITaskRepository
     {
-        private readonly SqlConnectionFactory _connectionFactory;
+        private readonly AppDbContext _dbContext;
 
-        public TaskRepository(SqlConnectionFactory connectionFactory)
+        public TaskRepository(AppDbContext dbContext)
         {
-            _connectionFactory = connectionFactory;
+            _dbContext = dbContext;
         }
 
         public async Task<TaskModel> GetByIdAsync(int id)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"SELECT * FROM Tasks WHERE Id = @Id";
-            return await connection.QueryFirstOrDefaultAsync<TaskModel>(sql, new { Id = id });
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == id);
         }
 
         public async Task<IEnumerable<TaskModel>> GetAllAsync()
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"SELECT * FROM Tasks ORDER BY CreatedAt DESC";
-            return await connection.QueryAsync<TaskModel>(sql);
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<TaskModel>> GetByUserIdAsync(string userId)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"SELECT * FROM Tasks WHERE UserId = @UserId ORDER BY CreatedAt DESC";
-            return await connection.QueryAsync<TaskModel>(sql, new { UserId = userId });
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<TaskModel>> GetByStatusAsync(TaskStatus status)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"SELECT * FROM Tasks WHERE Status = @Status ORDER BY CreatedAt DESC";
-            return await connection.QueryAsync<TaskModel>(sql, new { Status = status });
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .Where(t => t.Status == status)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<TaskModel>> GetByPriorityAsync(TaskPriority priority)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"SELECT * FROM Tasks WHERE Priority = @Priority ORDER BY CreatedAt DESC";
-            return await connection.QueryAsync<TaskModel>(sql, new { Priority = priority });
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .Where(t => t.Priority == priority)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<TaskModel>> GetByCategoryAsync(string category)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"SELECT * FROM Tasks WHERE Category = @Category ORDER BY CreatedAt DESC";
-            return await connection.QueryAsync<TaskModel>(sql, new { Category = category });
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .Where(t => t.Category == category)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<TaskModel>> GetOverdueTasksAsync()
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"SELECT * FROM Tasks WHERE DueDate < @Now AND Status != @CompletedStatus ORDER BY DueDate ASC";
-            return await connection.QueryAsync<TaskModel>(sql, new { Now = DateTime.Now, CompletedStatus = TaskStatus.Completed });
+            var now = DateTime.UtcNow;
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .Where(t => t.DueDate.HasValue && t.DueDate < now && t.Status != TaskStatus.Completed)
+                .OrderBy(t => t.DueDate)
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<TaskModel>> GetTasksDueSoonAsync(int days = 7)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var dueDate = DateTime.Now.AddDays(days);
-            var sql = @"SELECT * FROM Tasks WHERE DueDate BETWEEN @Now AND @DueDate AND Status != @CompletedStatus ORDER BY DueDate ASC";
-            return await connection.QueryAsync<TaskModel>(sql, new { Now = DateTime.Now, DueDate = dueDate, CompletedStatus = TaskStatus.Completed });
+            var now = DateTime.UtcNow;
+            var dueDate = now.AddDays(days);
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .Where(t => t.DueDate.HasValue && 
+                           t.DueDate >= now && 
+                           t.DueDate <= dueDate && 
+                           t.Status != TaskStatus.Completed)
+                .OrderBy(t => t.DueDate)
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<TaskModel>> FilterTasksAsync(string userId, TaskStatus? status, TaskPriority? priority, string category, DateTime? dueDateFrom, DateTime? dueDateTo)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var conditions = new List<string> { "UserId = @UserId" };
-            var parameters = new DynamicParameters();
-            parameters.Add("UserId", userId);
+            var query = _dbContext.Tasks
+                .AsNoTracking()
+                .Where(t => t.UserId == userId);
 
             if (status.HasValue)
             {
-                conditions.Add("Status = @Status");
-                parameters.Add("Status", status.Value);
+                query = query.Where(t => t.Status == status.Value);
             }
 
             if (priority.HasValue)
             {
-                conditions.Add("Priority = @Priority");
-                parameters.Add("Priority", priority.Value);
+                query = query.Where(t => t.Priority == priority.Value);
             }
 
             if (!string.IsNullOrEmpty(category))
             {
-                conditions.Add("Category = @Category");
-                parameters.Add("Category", category);
+                query = query.Where(t => t.Category == category);
             }
 
             if (dueDateFrom.HasValue)
             {
-                conditions.Add("DueDate >= @DueDateFrom");
-                parameters.Add("DueDateFrom", dueDateFrom.Value);
+                query = query.Where(t => t.DueDate.HasValue && t.DueDate >= dueDateFrom.Value);
             }
 
             if (dueDateTo.HasValue)
             {
-                conditions.Add("DueDate <= @DueDateTo");
-                parameters.Add("DueDateTo", dueDateTo.Value);
+                query = query.Where(t => t.DueDate.HasValue && t.DueDate <= dueDateTo.Value);
             }
 
-            var sql = $"SELECT * FROM Tasks WHERE {string.Join(" AND ", conditions)} ORDER BY CreatedAt DESC";
-            return await connection.QueryAsync<TaskModel>(sql, parameters);
+            return await query
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
         }
 
         public async Task<TaskModel> CreateAsync(TaskModel task)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"
-                INSERT INTO Tasks (Title, Description, Status, Priority, CreatedAt, DueDate, UserId, Category, Tags)
-                VALUES (@Title, @Description, @Status, @Priority, @CreatedAt, @DueDate, @UserId, @Category, @Tags);
-                SELECT CAST(SCOPE_IDENTITY() AS INT);";
-            
-            task.CreatedAt = DateTime.Now;
-            var id = await connection.QuerySingleAsync<int>(sql, task);
-            task.Id = id;
+            task.CreatedAt = DateTime.UtcNow;
+            _dbContext.Tasks.Add(task);
+            await _dbContext.SaveChangesAsync();
             return task;
         }
 
         public async Task<TaskModel> UpdateAsync(TaskModel task)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"
-                UPDATE Tasks 
-                SET Title = @Title, Description = @Description, Status = @Status, Priority = @Priority, 
-                    UpdatedAt = @UpdatedAt, DueDate = @DueDate, Category = @Category, Tags = @Tags
-                WHERE Id = @Id";
-            
-            task.UpdatedAt = DateTime.Now;
-            await connection.ExecuteAsync(sql, task);
+            task.UpdatedAt = DateTime.UtcNow;
+            _dbContext.Tasks.Update(task);
+            await _dbContext.SaveChangesAsync();
             return task;
         }
 
         public async Task<bool> DeleteAsync(int id)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"DELETE FROM Tasks WHERE Id = @Id";
-            var rowsAffected = await connection.ExecuteAsync(sql, new { Id = id });
-            return rowsAffected > 0;
+            var task = await _dbContext.Tasks.FindAsync(id);
+            if (task == null)
+                return false;
+
+            _dbContext.Tasks.Remove(task);
+            var result = await _dbContext.SaveChangesAsync();
+            return result > 0;
         }
 
         public async Task<bool> ExistsAsync(int id)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"SELECT COUNT(1) FROM Tasks WHERE Id = @Id";
-            var count = await connection.QuerySingleAsync<int>(sql, new { Id = id });
-            return count > 0;
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .AnyAsync(t => t.Id == id);
         }
 
         public async Task<int> GetCountByUserAsync(string userId)
         {
-            using var connection = _connectionFactory.CreateConnection();
-            var sql = @"SELECT COUNT(*) FROM Tasks WHERE UserId = @UserId";
-            return await connection.QuerySingleAsync<int>(sql, new { UserId = userId });
+            return await _dbContext.Tasks
+                .AsNoTracking()
+                .CountAsync(t => t.UserId == userId);
         }
     }
 } 

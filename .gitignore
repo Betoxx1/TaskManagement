@@ -169,9 +169,33 @@ Thumbs.db
 # Azure specific
 .azure/
 
+# Azurite storage emulator files
+azureFunctions/__azurite_db_blob__.json
+azureFunctions/__azurite_db_blob_extent__.json
+azureFunctions/__azurite_db_queue__.json
+azureFunctions/__azurite_db_queue_extent__.json
+azureFunctions/__azurite_db_table__.json
+azureFunctions/AzuriteConfig/
+
+# SQLite database files
+azureFunctions/*.db
+azureFunctions/*.db-shm
+azureFunctions/*.db-wal
+azureFunctions/taskmanagement.db
+
+# Solution and project backup files
+*.sln.bak
+*.csproj.bak
+*backup*
+*.backup
+
 # Temporary files
 *.tmp
 *.temp
 
 # Documentation folders (exclude from repository)
 docs/
+
+# Test scripts and temporary files
+test_*.sh
+test_*.bat

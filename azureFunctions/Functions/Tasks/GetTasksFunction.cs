@@ -1,73 +1,78 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using System.Net;
 using TaskManagement.Services.Interfaces;
 using TaskManagement.Utils;
-using TaskManagement.Factories;
-using TaskManagement.Repositories.Implementations;
-using TaskManagement.Services.Implementations;
 
 namespace TaskManagement
 {
-    public static class GetTasksFunction
+    public class GetTasksFunction
     {
-        [FunctionName("get")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "task")] HttpRequest req,
-            ILogger log,
-            ExecutionContext context)
+        private readonly ITaskService _taskService;
+        private readonly JwtValidator _jwtValidator;
+
+        public GetTasksFunction(
+            ITaskService taskService,
+            JwtValidator jwtValidator)
         {
-            log.LogInformation("Get Tasks function processed a request.");
+            _taskService = taskService;
+            _jwtValidator = jwtValidator;
+        }
+
+        [Function("get")]
+        public async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "task")] HttpRequestData req,
+            FunctionContext executionContext)
+        {
+            var logger = executionContext.GetLogger("GetTasksFunction");
+            logger.LogInformation("Get Tasks function processed a request.");
 
             try
             {
-                // 1. Configuración
-                var config = new ConfigurationBuilder()
-                    .SetBasePath(context.FunctionAppDirectory)
-                    .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
-                    .AddEnvironmentVariables()
-                    .Build();
-
-                // 2. Validar Authorization Header
-                if (!req.Headers.TryGetValue("Authorization", out var authHeader))
+                // 1. Validar Authorization Header
+                if (!req.Headers.TryGetValues("Authorization", out var authHeaders))
                 {
-                    return ResponseBuilder.Unauthorized("Token de autorización requerido");
+                    var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await unauthorizedResponse.WriteStringAsync("{\"error\": \"Token de autorización requerido\"}");
+                    return unauthorizedResponse;
                 }
 
-                var token = authHeader.ToString().Replace("Bearer ", "");
-                var jwtValidator = new JwtValidator(config);
-                var userId = jwtValidator.GetUserIdFromToken(token);
+                var token = authHeaders.FirstOrDefault()?.Replace("Bearer ", "");
+                var userId = _jwtValidator.GetUserIdFromToken(token);
                 
                 if (string.IsNullOrEmpty(userId))
                 {
-                    return ResponseBuilder.Unauthorized("Token inválido");
+                    var invalidTokenResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
+                    await invalidTokenResponse.WriteStringAsync("{\"error\": \"Token inválido\"}");
+                    return invalidTokenResponse;
                 }
 
-                // string userId = "user1";
+                // 2. Obtener todas las tareas del usuario
+                var tasks = await _taskService.GetAllTasksAsync(userId);
 
-                // 3. Inicializar servicios
-                var connectionFactory = new SqlConnectionFactory(config);
-                var taskRepository = new TaskRepository(connectionFactory);
-                var userRepository = new UserRepository(connectionFactory);
-                var taskService = new TaskService(taskRepository, userRepository);
-
-                // 4. Obtener todas las tareas del usuario
-                var tasks = await taskService.GetAllTasksAsync(userId);
-
-                // 5. Respuesta exitosa
-                log.LogInformation($"Se obtuvieron las tareas exitosamente para el usuario {userId}");
-                return ResponseBuilder.Success(tasks, "Tareas obtenidas exitosamente");
-
+                // 3. Respuesta exitosa
+                logger.LogInformation($"Se obtuvieron las tareas exitosamente para el usuario {userId}");
+                
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                await response.WriteStringAsync(System.Text.Json.JsonSerializer.Serialize(new 
+                { 
+                    success = true, 
+                    data = tasks, 
+                    message = "Tareas obtenidas exitosamente" 
+                }));
+                return response;
             }
             catch (Exception ex)
             {
-                log.LogError(ex, "Error inesperado al obtener las tareas");
-                return ResponseBuilder.InternalServerError("Error interno del servidor");
+                logger.LogError(ex, "Error inesperado al obtener las tareas");
+                var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+                await errorResponse.WriteStringAsync("{\"error\": \"Error interno del servidor\"}");
+                return errorResponse;
             }
         }
     }

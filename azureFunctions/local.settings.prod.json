@@ -1,0 +1,21 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+      "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+      "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+      "DbProvider": "SqlServer",
+      "ConnectionStrings__DefaultConnection": "Server=tcp:taskdbazure.database.windows.net,1433;Initial Catalog=TaskManagementDB;Persist Security Info=False;User ID=admin_user;Password=adm1n2025*;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;",
+      "Jwt__SecretKey": "your-super-secret-key-here-at-least-32-characters-long",
+      "Jwt__Issuer": "TaskManagement",
+      "Jwt__Audience": "TaskManagement.Users",
+      "Jwt__ExpirationMinutes": "60",
+      "AzureAd__ClientId": "06ccfd76-f3da-466f-8ba3-135f934b43e6",
+      "AzureAd__ClientSecret": "16c2ca6a-b0bf-45fa-8134-e1fda505a9db",
+      "AzureAd__TenantId": "9bd0efa0-b46a-4b61-af9d-1b024c2cb99c",
+      "AzureAd__RedirectUri": "http://localhost:7071/api/auth/callback"
+  },
+  "Host": {
+    "CORS": "http://localhost:3000",
+    "CORSCredentials": false
+  }
+}
