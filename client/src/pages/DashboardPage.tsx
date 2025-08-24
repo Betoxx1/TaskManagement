@@ -163,9 +163,7 @@ const DashboardPage: React.FC = () => {
   };
 
   const handleLogout = () => {
-    if (window.confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-      logout();
-    }
+    logout();
   };
 
   // Estadísticas
