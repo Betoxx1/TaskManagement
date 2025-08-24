@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import AuthSuccessPage from './pages/AuthSuccessPage';
+import AuthErrorPage from './pages/AuthErrorPage';
 import DashboardPage from './pages/DashboardPage';
 import './index.css';
 
@@ -30,6 +32,8 @@ const App: React.FC = () => {
             {/* Rutas públicas */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/auth/success" element={<AuthSuccessPage />} />
+            <Route path="/auth/error" element={<AuthErrorPage />} />
             
             {/* Rutas protegidas */}
             <Route 

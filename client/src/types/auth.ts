@@ -21,4 +21,6 @@ export interface AuthContextType {
   login: () => void;
   logout: () => void;
   handleAuthCallback: (code: string, state?: string) => Promise<void>;
+  setUser: (user: User | null) => void;
+  setToken: (token: string | null) => void;
 } 

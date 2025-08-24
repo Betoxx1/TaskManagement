@@ -16,6 +16,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
 using System.Net;
 using System.Linq;
+using System.Web;
 using TaskManagement.Utils;
 using TaskManagement.Repositories.Interfaces;
 using TaskManagement.Models;
@@ -57,17 +58,13 @@ namespace TaskManagement
                 if (!string.IsNullOrEmpty(error))
                 {
                     logger.LogWarning($"OAuth error: {error} - {errorDescription}");
-                    var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = $"Error de autenticación: {error} - {errorDescription}" }));
-                    return errorResponse;
+                    return CreateErrorRedirect(req, config, $"Error de autenticación: {error} - {errorDescription}");
                 }
 
                 // 4. Validar que tenemos el código de autorización
                 if (string.IsNullOrEmpty(authorizationCode))
                 {
-                    var badRequestResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await badRequestResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Código de autorización no proporcionado" }));
-                    return badRequestResponse;
+                    return CreateErrorRedirect(req, config, "Código de autorización no proporcionado");
                 }
 
                 // 5. Validar configuración de Azure AD (desde la sección Values de local.settings.json)
@@ -86,36 +83,28 @@ namespace TaskManagement
                     logger.LogWarning("Azure AD configuration missing - ClientId: {ClientId}, TenantId: {TenantId}", 
                         string.IsNullOrEmpty(clientId) ? "MISSING" : "CONFIGURED", 
                         string.IsNullOrEmpty(tenantId) ? "MISSING" : "CONFIGURED");
-                    var configErrorResponse = req.CreateResponse(HttpStatusCode.ServiceUnavailable);
-                    await configErrorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Configuración de Azure AD no completada. Contacte al administrador." }));
-                    return configErrorResponse;
+                    return CreateErrorRedirect(req, config, "Configuración de Azure AD no completada. Contacte al administrador.");
                 }
 
                 // 6. Intercambiar código por tokens
                 var tokenResponse = await ExchangeCodeForTokensAsync(authorizationCode, config, logger);
                 if (tokenResponse == null)
                 {
-                    var tokenErrorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await tokenErrorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Error al obtener tokens de acceso" }));
-                    return tokenErrorResponse;
+                    return CreateErrorRedirect(req, config, "Error al obtener tokens de acceso");
                 }
 
                 // 6. Validar que tenemos el IdToken
                 if (string.IsNullOrEmpty(tokenResponse.IdToken))
                 {
                     logger.LogError("IdToken is null or empty in token response");
-                    var tokenMissingResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                    await tokenMissingResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "ID Token no recibido de Azure AD. Verifique los scopes configurados." }));
-                    return tokenMissingResponse;
+                    return CreateErrorRedirect(req, config, "ID Token no recibido de Azure AD. Verifique los scopes configurados.");
                 }
 
                 // 7. Validar y extraer información del token
                 var userClaims = ValidateAndExtractClaims(tokenResponse.IdToken, config, logger);
                 if (userClaims == null)
                 {
-                    var unauthorizedResponse = req.CreateResponse(HttpStatusCode.Unauthorized);
-                    await unauthorizedResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Token inválido" }));
-                    return unauthorizedResponse;
+                    return CreateErrorRedirect(req, config, "Token inválido");
                 }
 
                 // 8. Crear o actualizar usuario en la base de datos
@@ -124,40 +113,30 @@ namespace TaskManagement
                 // 9. Generar JWT token para la aplicación
                 var appToken = GenerateApplicationToken(user, config);
 
-                // 10. Preparar respuesta de éxito
-                var authResponse = new AuthCallbackResponse
-                {
-                    Success = true,
-                    Token = appToken,
-                    User = new UserInfo
-                    {
-                        Id = user.Id,
-                        Name = user.Name,
-                        Email = user.Email,
-                        Role = user.Role
-                    },
-                    ExpiresIn = 3600, // 1 hora
-                    Message = "Autenticación exitosa"
-                };
-
-                logger.LogInformation($"Usuario autenticado exitosamente: {user.Email}");
+                // 10. Preparar redirección al frontend con datos del usuario
+                var frontendBaseUrl = config["Values:Frontend__BaseUrl"] ?? "http://localhost:3000";
+                var authSuccessPath = config["Values:Frontend__AuthSuccessPath"] ?? "/auth/success";
                 
-                var response = req.CreateResponse(HttpStatusCode.OK);
-                response.Headers.Add("Content-Type", "application/json; charset=utf-8");
-                await response.WriteStringAsync(JsonSerializer.Serialize(new 
-                { 
-                    success = true, 
-                    data = authResponse, 
-                    message = "Autenticación completada exitosamente" 
-                }));
+                // Crear parámetros para la URL de redirección (usando fragment para mayor seguridad)
+                var redirectUrl = $"{frontendBaseUrl}{authSuccessPath}#" +
+                    $"token={Uri.EscapeDataString(appToken)}&" +
+                    $"user_id={Uri.EscapeDataString(user.Id)}&" +
+                    $"user_name={Uri.EscapeDataString(user.Name)}&" +
+                    $"user_email={Uri.EscapeDataString(user.Email)}&" +
+                    $"user_role={Uri.EscapeDataString(user.Role)}&" +
+                    $"expires_in=3600&" +
+                    $"success=true";
+
+                logger.LogInformation($"Usuario autenticado exitosamente: {user.Email}, redirigiendo a: {frontendBaseUrl}{authSuccessPath}");
+                
+                var response = req.CreateResponse(HttpStatusCode.Redirect);
+                response.Headers.Add("Location", redirectUrl);
                 return response;
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error inesperado en el callback de autenticación");
-                var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-                await errorResponse.WriteStringAsync(JsonSerializer.Serialize(new { error = "Error interno durante la autenticación" }));
-                return errorResponse;
+                return CreateErrorRedirect(req, _configuration, "Error interno durante la autenticación");
             }
         }
 
@@ -327,6 +306,23 @@ namespace TaskManagement
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
+        }
+
+        /// <summary>
+        /// Crea una respuesta de redirección al frontend con información de error
+        /// </summary>
+        private static HttpResponseData CreateErrorRedirect(HttpRequestData req, IConfiguration config, string errorMessage)
+        {
+            var frontendBaseUrl = config["Values:Frontend__BaseUrl"] ?? "http://localhost:3000";
+            var authErrorPath = config["Values:Frontend__AuthErrorPath"] ?? "/auth/error";
+            
+            var redirectUrl = $"{frontendBaseUrl}{authErrorPath}#" +
+                $"error={Uri.EscapeDataString(errorMessage)}&" +
+                $"success=false";
+            
+            var response = req.CreateResponse(HttpStatusCode.Redirect);
+            response.Headers.Add("Location", redirectUrl);
+            return response;
         }
     }
 

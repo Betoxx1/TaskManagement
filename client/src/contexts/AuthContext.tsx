@@ -75,7 +75,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     login,
     logout,
-    handleAuthCallback
+    handleAuthCallback,
+    setUser,
+    setToken
   };
 
   return (
