@@ -2,11 +2,12 @@
 
 ## Descripción
 
-Sistema de gestión de tareas implementado con Azure Functions v4 (worker aislado), .NET 8 y Entity Framework Core. Incluye autenticación JWT, integración con Azure AD y soporte para SQL Server y SQLite.
+Sistema fullstack de gestión de tareas con backend en Azure Functions (.NET 8) y frontend en React + TypeScript. Incluye autenticación JWT, integración con Azure AD y soporte para SQL Server y SQLite.
 
 ## Arquitectura Implementada
 
 ### Stack Tecnológico
+**Backend:**
 - **Azure Functions v4** (isolated worker model)
 - **.NET 8**
 - **Entity Framework Core 8.0.8**
@@ -15,34 +16,21 @@ Sistema de gestión de tareas implementado con Azure Functions v4 (worker aislad
 - **JWT Authentication** con Azure AD
 - **Dependency Injection** nativo
 
-### Estructura del Proyecto
-```
-azureFunctions/
-├── Config/AppSettings.cs              # Configuración de la aplicación
-├── Data/
-│   ├── AppDbContext.cs               # Contexto de EF Core
-│   ├── Migrations/                   # Migraciones de EF Core
-│   └── Seed/DbInitializerHostedService.cs  # Inicialización y seed de DB
-├── DTOs/                            # Data Transfer Objects
-├── Functions/                       # Azure Functions endpoints
-│   ├── Auth/AuthCallbackFunction.cs  # Autenticación OAuth
-│   └── Tasks/                       # CRUD de tareas
-├── Models/                          # Entidades del dominio
-├── Repositories/                    # Patrón Repository con EF Core
-├── Services/                        # Lógica de negocio
-├── Utils/                          # Utilidades (JWT, validaciones)
-├── Program.cs                      # Configuración de DI y EF Core
-├── host.json                       # Configuración de Azure Functions
-└── local.settings.json             # Variables de desarrollo
-```
+**Frontend:**
+- **React 18** con **TypeScript**
+- **Vite** como build tool
+- **Context API** para manejo de estado
+- **CSS Modules** para estilos
+
 
 ## Instalación y Configuración
 
 ### Prerrequisitos
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Node.js 18+](https://nodejs.org/)
 - [Azure Functions Core Tools v4](https://docs.microsoft.com/en-us/azure/azure-functions/functions-run-local)
-- [SQL Server](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) o Docker
-- [Azure Storage Emulator/Azurite](https://docs.microsoft.com/en-us/azure/storage/common/storage-use-azurite)
+- [Azurite](https://docs.microsoft.com/en-us/azure/storage/common/storage-use-azurite) (instalado vía npm)
+- [SQL Server](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) o usar SQLite para desarrollo
 
 ### 1. Configuración de Base de Datos
 
@@ -54,7 +42,7 @@ azureFunctions/
 
 #### Opción B: SQLite (Desarrollo rápido)
 ```bash
-# Copiar configuración de desarrollo
+# Copiar configuración de desarrollo (REQUERIDO)
 cp azureFunctions/local.settings.dev.json azureFunctions/local.settings.json
 ```
 
@@ -77,24 +65,42 @@ dotnet ef migrations add "NombreMigracion" -o Data/Migrations
 
 ### 3. Configurar Azurite (Storage Emulator)
 ```bash
-# Opción 1: Instalar globalmente
+# Instalar Azurite globalmente (REQUERIDO)
 npm install -g azurite
-azurite --silent --location c:\\azurite --debug c:\\azurite\\debug.log
 
-# Opción 2: Docker
-docker run -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-storage/azurite
+# Ejecutar Azurite
+azurite --silent --location c:\\azurite --debug c:\\azurite\\debug.log
 ```
 
 ### 4. Ejecutar la Aplicación
 
-#### Desarrollo Local
+#### Opción 1: Con npm (Recomendado - Frontend + Backend)
+```bash
+# Instalar dependencias del frontend
+npm run install:all
+
+# Ejecutar frontend y backend simultáneamente
+npm start
+# o
+npm run dev
+```
+
+#### Opción 2: Solo Backend (Azure Functions)
 ```bash
 cd azureFunctions
 dotnet build
 func start
 ```
 
-La aplicación estará disponible en: `http://localhost:7071`
+#### Opción 3: Solo Frontend (React + Vite)
+```bash
+cd client
+npm run dev
+```
+
+**URLs de la aplicación:**
+- Backend (Azure Functions): `http://localhost:7071`
+- Frontend (React): `http://localhost:5173`
 
 #### Endpoints Principales
 - `GET /api/health` - Health check
@@ -103,27 +109,6 @@ La aplicación estará disponible en: `http://localhost:7071`
 - `PUT /api/tasks/{id}` - Actualizar tarea
 - `DELETE /api/tasks/{id}` - Eliminar tarea
 - `GET /api/auth/callback` - Callback de autenticación OAuth
-
-## Configuración con Docker
-
-### Docker Compose (Recomendado)
-```bash
-# Ejecutar todo el stack (SQL Server + Azurite + Functions)
-docker-compose up -d
-
-# Solo bases de datos
-docker-compose up azurite sqlserver -d
-
-# Ver logs
-docker-compose logs -f funcapp
-```
-
-### Docker Individual
-```bash
-cd azureFunctions
-docker build -t taskmanagement-functions .
-docker run -p 7071:80 -v $(pwd)/local.settings.json:/home/site/wwwroot/local.settings.json taskmanagement-functions
-```
 
 ## Configuración de Variables de Entorno
 
@@ -167,9 +152,6 @@ docker run -p 7071:80 -v $(pwd)/local.settings.json:/home/site/wwwroot/local.set
 - **Causa**: Conflicto entre `System.Threading.Tasks.TaskStatus` y `TaskManagement.Models.TaskStatus`
 - **Solución**: Ya resuelto con alias `using TaskStatus = TaskManagement.Models.TaskStatus;`
 
-### Problemas con Docker en Mac ARM
-- Usar `platform: linux/amd64` en docker-compose.yml
-- Las imágenes de Azure Functions aún no tienen soporte nativo ARM64
 
 ## Comandos Útiles de Entity Framework
 
@@ -202,7 +184,7 @@ dotnet ef migrations remove
 - [x] Soporte multi-proveedor (SQL Server + SQLite)
 - [x] Repositorios actualizados con EF Core (AsNoTracking, async/await)
 - [x] Dependency Injection configurado correctamente
-- [x] Docker y docker-compose funcional
+- [x] Frontend React + TypeScript integrado
 - [x] Migraciones EF Core generadas
 
 ### 🔄 Pendiente/Recomendado

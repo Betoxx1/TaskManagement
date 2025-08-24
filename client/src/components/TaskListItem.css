@@ -1,0 +1,392 @@
+/* Task List Item - Microsoft To Do Style */
+.task-list-item {
+  border-bottom: 1px solid #f3f2f1;
+  background: white;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.task-list-item:hover {
+  background: #faf9f8;
+}
+
+.task-list-item.selected {
+  background: #f3f2f1;
+  border-left: 3px solid #0078d4;
+}
+
+.task-list-item.completed {
+  opacity: 0.7;
+}
+
+.task-list-item:last-child {
+  border-bottom: none;
+}
+
+/* Header Row - Status y Acciones arriba */
+.task-header-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  gap: 12px;
+  background: #faf9f8;
+  border-bottom: 1px solid #f3f2f1;
+}
+
+.task-select {
+  display: flex;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.select-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.task-status {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 50%;
+  transition: background-color 0.15s ease;
+}
+
+.task-status:hover {
+  background: #f3f2f1;
+}
+
+.status-checkbox {
+  transition: all 0.15s ease;
+}
+
+.status-checkbox.pending {
+  color: #6b7280;
+}
+
+.status-checkbox.in-progress {
+  color: #0078d4;
+}
+
+.status-checkbox.completed {
+  color: #107c10;
+}
+
+.status-checkbox.cancelled {
+  color: #d13438;
+}
+
+/* Status Dropdown en header */
+.task-status-dropdown {
+  flex: 1;
+  margin-right: auto;
+}
+
+/* Title Row - Status checkbox, Title, Priority Badge y Tags */
+.task-title-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px 8px 16px;
+  gap: 12px;
+}
+
+.task-meta-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.task-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #323130;
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+  word-break: break-word;
+}
+
+.task-title.completed {
+  text-decoration: line-through;
+  color: #605e5c;
+}
+
+.priority-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.task-tags-inline {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tag-chip {
+  background: #f3f2f1;
+  color: #323130;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tag-chip:hover {
+  background: #edebe9;
+  transform: translateY(-1px);
+}
+
+.tag-chip.more-tags {
+  background: #e1dfdd;
+  cursor: default;
+}
+
+.tag-chip.more-tags:hover {
+  transform: none;
+}
+
+/* Description Section - Colapsable */
+.task-description-section {
+  padding: 0 16px;
+  border-top: 1px solid #f3f2f1;
+}
+
+.description-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 12px;
+  color: #605e5c;
+  transition: all 0.15s ease;
+}
+
+.description-toggle-btn:hover {
+  color: #323130;
+}
+
+.task-description {
+  padding-bottom: 8px;
+}
+
+.description-text {
+  font-size: 13px;
+  color: #605e5c;
+  line-height: 1.4;
+  margin: 0;
+  word-break: break-word;
+}
+
+.status-dropdown {
+  background: white;
+  border: 1px solid #d2d0ce;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #323130;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 100px;
+}
+
+.status-dropdown:hover {
+  border-color: #c8c6c4;
+  background: #faf9f8;
+}
+
+.status-dropdown:focus {
+  outline: none;
+  border-color: #0078d4;
+  box-shadow: 0 0 0 1px #0078d4;
+}
+
+.task-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #605e5c;
+  transition: all 0.15s ease;
+}
+
+.action-btn:hover {
+  background: #f3f2f1;
+  color: #323130;
+}
+
+.action-btn.delete-btn:hover {
+  background: #fdf2f2;
+  color: #d13438;
+}
+
+/* Meta Information */
+.task-meta-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 16px 12px 16px;
+  border-top: 1px solid #f3f2f1;
+  background: white;
+}
+
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #605e5c;
+}
+
+.meta-item.due-date.overdue {
+  color: #d13438;
+}
+
+.overdue-icon {
+  color: #d13438;
+}
+
+.dates {
+  display: flex;
+  gap: 8px;
+}
+
+.created-date, .updated-date {
+  white-space: nowrap;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .task-main-row {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  
+  .task-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  
+  .task-title {
+    min-width: unset;
+    width: 100%;
+  }
+  
+  .task-actions-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  
+  .status-dropdown {
+    width: 100%;
+    max-width: 150px;
+  }
+  
+  .task-actions {
+    opacity: 1;
+    margin-left: 0;
+  }
+  
+  .task-secondary-row {
+    padding: 0 12px 10px 42px;
+  }
+  
+  .task-meta-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  
+  .dates {
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .task-main-row {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  
+  .task-secondary-row {
+    padding: 0 10px 8px 36px;
+  }
+  
+  .task-title {
+    font-size: 13px;
+  }
+  
+  .priority-badge {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+  
+  .tag-chip {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+  
+  .status-dropdown {
+    font-size: 10px;
+  }
+  
+  .action-btn {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* Animation for smooth interactions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.task-list-item {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Focus states for accessibility */
+.task-status:focus,
+.action-btn:focus,
+.tag-chip:focus,
+.expand-btn:focus {
+  outline: 2px solid #0078d4;
+  outline-offset: 2px;
+}

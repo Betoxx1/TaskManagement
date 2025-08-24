@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Calendar, Flag, Folder, Hash, Clock, Rocket, CheckCircle2, XCircle, Circle } from 'lucide-react';
 import { CreateTaskDto, UpdateTaskDto, Task, TaskStatus, TaskPriority } from '../types/task';
+import './TaskForm.css';
 
 interface TaskFormProps {
   task?: Task; // Si se pasa, es edición; si no, es creación
@@ -25,18 +26,22 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel, isLoading
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
+    // Título es requerido
     if (!formData.title.trim()) {
-      newErrors.title = 'El título es requerido';
+      newErrors.title = 'Requerido';
     } else if (formData.title.length > 200) {
       newErrors.title = 'El título no puede exceder 200 caracteres';
     }
 
-    if (formData.description && formData.description.length > 1000) {
-      newErrors.description = 'La descripción no puede exceder 1000 caracteres';
+    // Categoría es requerida
+    if (!formData.category.trim()) {
+      newErrors.category = 'Requerido';
+    } else if (formData.category.length > 100) {
+      newErrors.category = 'La categoría no puede exceder 100 caracteres';
     }
 
-    if (formData.category && formData.category.length > 100) {
-      newErrors.category = 'La categoría no puede exceder 100 caracteres';
+    if (formData.description && formData.description.length > 1000) {
+      newErrors.description = 'La descripción no puede exceder 1000 caracteres';
     }
 
     if (formData.tags && formData.tags.length > 500) {
@@ -57,12 +62,12 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel, isLoading
     try {
       const submitData = {
         title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
+        description: formData.description.trim() || '',
         status: formData.status,
         priority: formData.priority,
         dueDate: formData.dueDate || undefined,
-        category: formData.category.trim() || undefined,
-        tags: formData.tags.trim() || undefined
+        category: formData.category.trim(),
+        tags: formData.tags.trim() || ''
       };
 
       await onSubmit(submitData);
@@ -79,6 +84,37 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel, isLoading
     }
   };
 
+  const getStatusIcon = (status: TaskStatus) => {
+    switch (status) {
+      case TaskStatus.Pending:
+        return <Clock size={14} className="status-icon pending" />;
+      case TaskStatus.InProgress:
+        return <Rocket size={14} className="status-icon in-progress" />;
+      case TaskStatus.Completed:
+        return <CheckCircle2 size={14} className="status-icon completed" />;
+      case TaskStatus.Cancelled:
+        return <XCircle size={14} className="status-icon cancelled" />;
+      default:
+        return <Circle size={14} className="status-icon" />;
+    }
+  };
+
+  const getPriorityIcon = (priority: TaskPriority) => {
+    const baseClass = "priority-icon";
+    switch (priority) {
+      case TaskPriority.Low:
+        return <Flag size={14} className={`${baseClass} low`} />;
+      case TaskPriority.Medium:
+        return <Flag size={14} className={`${baseClass} medium`} />;
+      case TaskPriority.High:
+        return <Flag size={14} className={`${baseClass} high`} />;
+      case TaskPriority.Critical:
+        return <Flag size={14} className={`${baseClass} critical`} />;
+      default:
+        return <Flag size={14} className={baseClass} />;
+    }
+  };
+
   return (
     <div className="task-form-overlay">
       <div className="task-form-container">
@@ -91,7 +127,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel, isLoading
 
         <form onSubmit={handleSubmit} className="task-form">
           <div className="form-group">
-            <label htmlFor="title">Título *</label>
+            <label htmlFor="title">
+              Título <span className="required-asterisk">*</span>
+            </label>
             <input
               type="text"
               id="title"
@@ -123,38 +161,66 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel, isLoading
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="status">Estado</label>
-              <select
-                id="status"
-                value={formData.status}
-                onChange={(e) => handleInputChange('status', parseInt(e.target.value))}
-                disabled={isLoading}
-              >
-                <option value={TaskStatus.Pending}>Pendiente</option>
-                <option value={TaskStatus.InProgress}>En Progreso</option>
-                <option value={TaskStatus.Completed}>Completada</option>
-                <option value={TaskStatus.Cancelled}>Cancelada</option>
-              </select>
+              <div className="custom-select-wrapper">
+                <div className="select-display">
+                  {getStatusIcon(formData.status)}
+                  <span>
+                    {formData.status === TaskStatus.Pending && 'Pendiente'}
+                    {formData.status === TaskStatus.InProgress && 'En Progreso'}
+                    {formData.status === TaskStatus.Completed && 'Completada'}
+                    {formData.status === TaskStatus.Cancelled && 'Cancelada'}
+                  </span>
+                </div>
+                <select
+                  id="status"
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', parseInt(e.target.value))}
+                  disabled={isLoading}
+                >
+                  <option value={TaskStatus.Pending}>Pendiente</option>
+                  <option value={TaskStatus.InProgress}>En Progreso</option>
+                  <option value={TaskStatus.Completed}>Completada</option>
+                  <option value={TaskStatus.Cancelled}>Cancelada</option>
+                </select>
+              </div>
             </div>
 
             <div className="form-group">
-              <label htmlFor="priority">Prioridad</label>
-              <select
-                id="priority"
-                value={formData.priority}
-                onChange={(e) => handleInputChange('priority', parseInt(e.target.value))}
-                disabled={isLoading}
-              >
-                <option value={TaskPriority.Low}>Baja</option>
-                <option value={TaskPriority.Medium}>Media</option>
-                <option value={TaskPriority.High}>Alta</option>
-                <option value={TaskPriority.Critical}>Crítica</option>
-              </select>
+              <label htmlFor="priority">
+                <Flag size={14} />
+                Prioridad
+              </label>
+              <div className="custom-select-wrapper">
+                <div className="select-display">
+                  {getPriorityIcon(formData.priority)}
+                  <span>
+                    {formData.priority === TaskPriority.Low && 'Baja'}
+                    {formData.priority === TaskPriority.Medium && 'Media'}
+                    {formData.priority === TaskPriority.High && 'Alta'}
+                    {formData.priority === TaskPriority.Critical && 'Crítica'}
+                  </span>
+                </div>
+                <select
+                  id="priority"
+                  value={formData.priority}
+                  onChange={(e) => handleInputChange('priority', parseInt(e.target.value))}
+                  disabled={isLoading}
+                >
+                  <option value={TaskPriority.Low}>Baja</option>
+                  <option value={TaskPriority.Medium}>Media</option>
+                  <option value={TaskPriority.High}>Alta</option>
+                  <option value={TaskPriority.Critical}>Crítica</option>
+                </select>
+              </div>
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="dueDate">Fecha de Vencimiento</label>
+              <label htmlFor="dueDate">
+                <Calendar size={14} />
+                Fecha de Vencimiento
+              </label>
               <input
                 type="date"
                 id="dueDate"
@@ -165,7 +231,10 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel, isLoading
             </div>
 
             <div className="form-group">
-              <label htmlFor="category">Categoría</label>
+              <label htmlFor="category">
+                <Folder size={14} />
+                Categoría <span className="required-asterisk">*</span>
+              </label>
               <input
                 type="text"
                 id="category"
@@ -181,7 +250,10 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel, isLoading
           </div>
 
           <div className="form-group">
-            <label htmlFor="tags">Etiquetas</label>
+            <label htmlFor="tags">
+              <Hash size={14} />
+              Etiquetas
+            </label>
             <input
               type="text"
               id="tags"

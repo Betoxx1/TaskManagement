@@ -1,0 +1,399 @@
+/* Task Form Modal - Microsoft To Do Style */
+.task-form-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeInOverlay 0.2s ease-out;
+}
+
+.task-form-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: slideUpModal 0.3s ease-out;
+}
+
+/* Header */
+.task-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: #faf9f8;
+  border-bottom: 1px solid #edebe9;
+}
+
+.task-form-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #323130;
+}
+
+.close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #605e5c;
+  transition: all 0.15s ease;
+}
+
+.close-btn:hover:not(:disabled) {
+  background: #f3f2f1;
+  color: #323130;
+}
+
+.close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Form */
+.task-form {
+  padding: 24px;
+  overflow-y: auto;
+  max-height: calc(90vh - 140px);
+}
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #323130;
+  margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d2d0ce;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #0078d4;
+  box-shadow: 0 0 0 1px #0078d4;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #a19f9d;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.4;
+}
+
+.form-group select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8"><path fill="%23605e5c" d="M6 8L0 2 1.4.6 6 5.2 10.6.6 12 2z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  padding-right: 36px;
+}
+
+/* Form Row */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Error States */
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+  border-color: #d13438;
+  box-shadow: 0 0 0 1px #d13438;
+}
+
+.error-message {
+  display: block;
+  color: #d13438;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Form Hints */
+.form-hint {
+  display: block;
+  color: #605e5c;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Form Actions */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid #f3f2f1;
+}
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  min-width: 100px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f3f2f1;
+  color: #323130;
+  border: 1px solid #d2d0ce;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #edebe9;
+  border-color: #c8c6c4;
+}
+
+.btn-primary {
+  background: #0078d4;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #106ebe;
+}
+
+/* Required Field Indicator */
+.required-asterisk {
+  color: #d13438;
+  margin-left: 2px;
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .task-form-overlay {
+    padding: 10px;
+  }
+  
+  .task-form-container {
+    max-width: none;
+    width: 100%;
+    max-height: 95vh;
+    border-radius: 8px;
+  }
+  
+  .task-form-header {
+    padding: 16px 20px;
+  }
+  
+  .task-form-header h2 {
+    font-size: 18px;
+  }
+  
+  .task-form {
+    padding: 20px;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+  
+  .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .task-form-overlay {
+    padding: 0;
+    align-items: flex-start;
+  }
+  
+  .task-form-container {
+    border-radius: 0;
+    max-height: 100vh;
+    height: 100vh;
+  }
+  
+  .task-form-header {
+    padding: 12px 16px;
+  }
+  
+  .task-form {
+    padding: 16px;
+  }
+  
+  .form-group {
+    margin-bottom: 16px;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 8px 10px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+/* Animations */
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpModal {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Loading State */
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled {
+  background: #faf9f8;
+  color: #a19f9d;
+  cursor: not-allowed;
+}
+
+/* Custom Select Wrappers */
+.custom-select-wrapper {
+  position: relative;
+}
+
+.select-display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  pointer-events: none;
+  background: white;
+  border: 1px solid #d2d0ce;
+  border-radius: 6px;
+  z-index: 1;
+  transition: all 0.15s ease;
+}
+
+.custom-select-wrapper select {
+  opacity: 0;
+  position: relative;
+  z-index: 2;
+  cursor: pointer;
+}
+
+.custom-select-wrapper:hover .select-display {
+  border-color: #c8c6c4;
+}
+
+.custom-select-wrapper select:focus + .select-display,
+.custom-select-wrapper select:focus ~ .select-display {
+  border-color: #0078d4;
+  box-shadow: 0 0 0 1px #0078d4;
+}
+
+/* Icon Colors */
+.status-icon.pending {
+  color: #6b7280;
+}
+
+.status-icon.in-progress {
+  color: #0078d4;
+}
+
+.status-icon.completed {
+  color: #107c10;
+}
+
+.status-icon.cancelled {
+  color: #d13438;
+}
+
+.priority-icon.low {
+  color: #10b981;
+}
+
+.priority-icon.medium {
+  color: #f59e0b;
+}
+
+.priority-icon.high {
+  color: #f97316;
+}
+
+.priority-icon.critical {
+  color: #ef4444;
+}
+
+/* Focus Ring for Accessibility */
+.close-btn:focus,
+.btn:focus,
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: 2px solid #0078d4;
+  outline-offset: 2px;
+}

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, RotateCcw, User, LogOut, ClipboardList, Clock, Rocket, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Plus, RotateCcw, User, LogOut, ClipboardList, Clock, Rocket, CheckCircle2, AlertCircle, X, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Task, CreateTaskDto, UpdateTaskDto, TaskFilters as TaskFiltersType, TaskStatus } from '../types/task';
 import taskService from '../services/taskService';
-import TaskCard from '../components/TaskCard';
+import TaskList from '../components/TaskList';
 import TaskForm from '../components/TaskForm';
 import TaskFilters from '../components/TaskFilters';
 import './DashboardPage.css';
-import '../components/TaskComponents.css';
+import '../components/TaskList.css';
+import '../components/TaskListItem.css';
 
 const DashboardPage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -24,16 +25,26 @@ const DashboardPage: React.FC = () => {
   // Cargar tareas
   const loadTasks = useCallback(async () => {
     try {
+      console.log('🚀 [DashboardPage] Iniciando carga de tareas...');
       setLoading(true);
       setError(null);
+      
       const tasksData = await taskService.getAllTasks();
+      
+      console.log('📥 [DashboardPage] Tareas recibidas del servicio:', tasksData);
+      console.log('🔢 [DashboardPage] Cantidad de tareas:', tasksData?.length || 0);
+      console.log('📝 [DashboardPage] Primera tarea (si existe):', tasksData?.[0]);
+      
       setTasks(tasksData);
       setFilteredTasks(tasksData);
+      
+      console.log('✅ [DashboardPage] Estado actualizado con tareas');
     } catch (err) {
+      console.error('❌ [DashboardPage] Error loading tasks:', err);
       setError(err instanceof Error ? err.message : 'Error cargando tareas');
-      console.error('Error loading tasks:', err);
     } finally {
       setLoading(false);
+      console.log('🏁 [DashboardPage] Carga de tareas finalizada');
     }
   }, []);
 
@@ -49,7 +60,8 @@ const DashboardPage: React.FC = () => {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(task =>
         task.title.toLowerCase().includes(searchLower) ||
-        task.description.toLowerCase().includes(searchLower)
+        task.description.toLowerCase().includes(searchLower) ||
+        task.tags.toLowerCase().includes(searchLower)
       );
     }
 
@@ -85,6 +97,12 @@ const DashboardPage: React.FC = () => {
   const handleClearFilters = useCallback(() => {
     setFilteredTasks(tasks);
   }, [tasks]);
+
+  // Manejar filtro por tag
+  const handleTagFilter = useCallback((tag: string) => {
+    const newFilters: TaskFiltersType = { search: tag };
+    handleFiltersChange(newFilters);
+  }, [handleFiltersChange]);
 
   // CRUD Operations
   const handleCreateTask = async (taskData: CreateTaskDto) => {
@@ -179,7 +197,10 @@ const DashboardPage: React.FC = () => {
     <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="header-content">
-          <h1>📋 Task Management</h1>
+          <h1>
+            <ClipboardCheck size={28} style={{ marginRight: '8px', display: 'inline-block' }} />
+            Task Management
+          </h1>
           <div className="user-menu">
             <div className="user-info">
               <span className="user-name">{user?.name}</span>
@@ -273,39 +294,14 @@ const DashboardPage: React.FC = () => {
 
         {/* Tasks List */}
         <div className="tasks-section">
-          {loading && (
-            <div className="loading-message">
-              <div className="loading-spinner"></div>
-              <p>Cargando tareas...</p>
-            </div>
-          )}
-
-          {!loading && filteredTasks.length === 0 && (
-            <div className="empty-state">
-              <div className="empty-icon">
-                <ClipboardList size={64} />
-              </div>
-              <h3>No hay tareas</h3>
-              <p>
-                {tasks.length === 0 
-                  ? '¡Comienza creando tu primera tarea!'
-                  : 'No se encontraron tareas con los filtros actuales.'
-                }
-              </p>
-            </div>
-          )}
-
-          <div className="tasks-grid">
-            {filteredTasks.map(task => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onEdit={handleEditTask}
-                onDelete={handleDeleteTask}
-                onStatusChange={handleStatusChange}
-              />
-            ))}
-          </div>
+          <TaskList
+            tasks={filteredTasks}
+            onEdit={handleEditTask}
+            onDelete={handleDeleteTask}
+            onStatusChange={handleStatusChange}
+            onTagClick={handleTagFilter}
+            loading={loading}
+          />
         </div>
       </main>
 
