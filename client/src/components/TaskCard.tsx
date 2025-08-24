@@ -1,4 +1,5 @@
 import React from 'react';
+import { Edit2, Trash2, Calendar, Folder, Tag, Circle, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { Task, getStatusLabel, getPriorityLabel, getStatusColor, getPriorityColor } from '../types/task';
 
 interface TaskCardProps {
@@ -40,14 +41,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onStatusCha
             onClick={() => onEdit(task)}
             title="Editar tarea"
           >
-            ✏️
+            <Edit2 size={16} />
           </button>
           <button 
             className="action-btn delete-btn"
             onClick={() => onDelete(task.id)}
             title="Eliminar tarea"
           >
-            🗑️
+            <Trash2 size={16} />
           </button>
         </div>
       </div>
@@ -74,24 +75,29 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onStatusCha
 
         {task.category && (
           <div className="task-category">
-            📁 {task.category}
+            <Folder size={14} />
+            <span>{task.category}</span>
           </div>
         )}
 
         {task.dueDate && (
           <div className={`task-due-date ${isOverdue(task.dueDate) ? 'overdue' : ''}`}>
-            📅 Vence: {formatDate(task.dueDate)}
+            <Calendar size={14} />
+            <span>Vence: {formatDate(task.dueDate)}</span>
             {isOverdue(task.dueDate) && <span className="overdue-indicator">¡Vencida!</span>}
           </div>
         )}
 
         {getTagsList(task.tags).length > 0 && (
           <div className="task-tags">
-            {getTagsList(task.tags).map((tag, index) => (
-              <span key={index} className="tag">
-                #{tag}
-              </span>
-            ))}
+            <Tag size={14} />
+            <div className="tags-list">
+              {getTagsList(task.tags).map((tag, index) => (
+                <span key={index} className="tag">
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 

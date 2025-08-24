@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CheckCircle2, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types/auth';
@@ -105,7 +106,9 @@ const AuthSuccessPage: React.FC = () => {
       case 'success':
         return (
           <>
-            <div className="success-icon">✓</div>
+            <div className="success-icon">
+              <CheckCircle2 size={64} color="#10b981" />
+            </div>
             <h2>¡Bienvenido/a!</h2>
             {userData && (
               <div className="user-info">
@@ -122,7 +125,9 @@ const AuthSuccessPage: React.FC = () => {
       case 'error':
         return (
           <>
-            <div className="error-icon">✗</div>
+            <div className="error-icon">
+              <X size={64} color="#ef4444" />
+            </div>
             <h2>Error de autenticación</h2>
             <p className="error-message">{errorMessage}</p>
             <p>Serás redirigido al login en unos segundos...</p>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 import { CreateTaskDto, UpdateTaskDto, Task, TaskStatus, TaskPriority } from '../types/task';
 
 interface TaskFormProps {
@@ -84,7 +85,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel, isLoading
         <div className="task-form-header">
           <h2>{task ? 'Editar Tarea' : 'Nueva Tarea'}</h2>
           <button className="close-btn" onClick={onCancel} disabled={isLoading}>
-            ✕
+            <X size={20} />
           </button>
         </div>
 

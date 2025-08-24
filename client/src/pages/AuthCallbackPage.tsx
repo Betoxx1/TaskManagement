@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import './AuthCallbackPage.css';
@@ -62,7 +63,9 @@ const AuthCallbackPage: React.FC = () => {
       case 'processing':
         return (
           <>
-            <div className="loading-spinner-large"></div>
+            <div className="loading-spinner-large">
+              <Loader2 size={48} className="animate-spin" />
+            </div>
             <h2>Procesando autenticación...</h2>
             <p>Por favor espera mientras validamos tu identidad</p>
           </>
@@ -71,7 +74,9 @@ const AuthCallbackPage: React.FC = () => {
       case 'success':
         return (
           <>
-            <div className="success-icon">✓</div>
+            <div className="success-icon">
+              <CheckCircle2 size={64} color="#10b981" />
+            </div>
             <h2>¡Autenticación exitosa!</h2>
             <p>Redirigiendo al panel de control...</p>
           </>
@@ -80,7 +85,9 @@ const AuthCallbackPage: React.FC = () => {
       case 'error':
         return (
           <>
-            <div className="error-icon">✗</div>
+            <div className="error-icon">
+              <AlertCircle size={64} color="#ef4444" />
+            </div>
             <h2>Error de autenticación</h2>
             <p className="error-message">{errorMessage}</p>
             <p>Serás redirigido al login en unos segundos...</p>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './AuthCallbackPage.css';
 
@@ -43,7 +44,9 @@ const AuthErrorPage: React.FC = () => {
   return (
     <div className="callback-container">
       <div className="callback-card">
-        <div className="error-icon">✗</div>
+        <div className="error-icon">
+          <AlertCircle size={64} color="#ef4444" />
+        </div>
         <h2>Error de autenticación</h2>
         <p className="error-message">{errorMessage}</p>
         <p>Redirigiendo al login en {countdown} segundos...</p>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, RotateCcw, User, LogOut, ClipboardList, Clock, Rocket, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Task, CreateTaskDto, UpdateTaskDto, TaskFilters as TaskFiltersType, TaskStatus } from '../types/task';
 import taskService from '../services/taskService';
@@ -195,28 +196,36 @@ const DashboardPage: React.FC = () => {
         {/* Stats Cards */}
         <div className="stats-section">
           <div className="stat-card">
-            <div className="stat-icon">📝</div>
+            <div className="stat-icon">
+              <ClipboardList size={32} />
+            </div>
             <div className="stat-info">
               <span className="stat-number">{stats.total}</span>
               <span className="stat-label">Total</span>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">⏳</div>
+            <div className="stat-icon">
+              <Clock size={32} />
+            </div>
             <div className="stat-info">
               <span className="stat-number">{stats.pending}</span>
               <span className="stat-label">Pendientes</span>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">🚀</div>
+            <div className="stat-icon">
+              <Rocket size={32} />
+            </div>
             <div className="stat-info">
               <span className="stat-number">{stats.inProgress}</span>
               <span className="stat-label">En Progreso</span>
             </div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon">✅</div>
+            <div className="stat-icon">
+              <CheckCircle2 size={32} />
+            </div>
             <div className="stat-info">
               <span className="stat-number">{stats.completed}</span>
               <span className="stat-label">Completadas</span>
@@ -230,22 +239,29 @@ const DashboardPage: React.FC = () => {
             className="btn btn-primary"
             onClick={() => setShowTaskForm(true)}
           >
-            ➕ Nueva Tarea
+            <Plus size={16} />
+            Nueva Tarea
           </button>
           <button 
             className="btn btn-secondary"
             onClick={loadTasks}
             disabled={loading}
           >
-            {loading ? '🔄 Cargando...' : '🔄 Actualizar'}
+            <RotateCcw size={16} className={loading ? 'rotating' : ''} />
+            {loading ? 'Cargando...' : 'Actualizar'}
           </button>
         </div>
 
         {/* Error Message */}
         {error && (
           <div className="error-banner">
-            <span>❌ {error}</span>
-            <button onClick={() => setError(null)}>✕</button>
+            <span>
+              <AlertCircle size={16} style={{ marginRight: '8px', display: 'inline-block' }} />
+              {error}
+            </span>
+            <button onClick={() => setError(null)}>
+              <X size={16} />
+            </button>
           </div>
         )}
 
@@ -266,7 +282,9 @@ const DashboardPage: React.FC = () => {
 
           {!loading && filteredTasks.length === 0 && (
             <div className="empty-state">
-              <div className="empty-icon">📝</div>
+              <div className="empty-icon">
+                <ClipboardList size={64} />
+              </div>
               <h3>No hay tareas</h3>
               <p>
                 {tasks.length === 0 

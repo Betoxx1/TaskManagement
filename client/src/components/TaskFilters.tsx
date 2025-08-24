@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Filter, ChevronDown } from 'lucide-react';
 import { TaskFilters as TaskFiltersType, TaskStatus, TaskPriority } from '../types/task';
 
 interface TaskFiltersProps {
@@ -38,8 +39,9 @@ const TaskFilters: React.FC<TaskFiltersProps> = ({ onFiltersChange, onClearFilte
             className="toggle-btn"
             onClick={() => setIsExpanded(!isExpanded)}
           >
-            🔍 Filtros {hasActiveFilters && <span className="active-indicator">({Object.values(filters).filter(v => v !== undefined && v !== '').length})</span>}
-            <span className={`arrow ${isExpanded ? 'expanded' : ''}`}>▼</span>
+            <Filter size={16} />
+            Filtros {hasActiveFilters && <span className="active-indicator">({Object.values(filters).filter(v => v !== undefined && v !== '').length})</span>}
+            <ChevronDown size={16} className={`arrow ${isExpanded ? 'expanded' : ''}`} />
           </button>
           {hasActiveFilters && (
             <button 

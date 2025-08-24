@@ -199,3 +199,5 @@ docs/
 # Test scripts and temporary files
 test_*.sh
 test_*.bat
+client/API_DOCUMENTATION.md
+client/FRONTEND_DEVELOPMENT.md

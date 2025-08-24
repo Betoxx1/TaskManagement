@@ -237,6 +237,14 @@
   }
 }
 
+.rotating {
+  animation: spin 1s linear infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
 /* Legacy styles to maintain compatibility */
 .welcome-section {
   margin-bottom: 3rem;
