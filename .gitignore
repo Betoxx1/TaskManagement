@@ -175,6 +175,9 @@ azureFunctions/__azurite_db_blob_extent__.json
 azureFunctions/__azurite_db_queue__.json
 azureFunctions/__azurite_db_queue_extent__.json
 azureFunctions/__azurite_db_table__.json
+azureFunctions/__blobstorage__
+azureFunctions/__queuestorage__
+azureFunctions/azurite.log
 azureFunctions/AzuriteConfig/
 
 # SQLite database files
